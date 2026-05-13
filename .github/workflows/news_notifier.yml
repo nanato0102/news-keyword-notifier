@@ -31,17 +31,13 @@ jobs:
           import feedparser
           import requests
           import os
-          import urllib.parse
 
-          # 検索キーワード
-          keywords = 'M&A "Corporate Finance" Investment Banking "Cross-border deal"'
-          
-          # キーワードをURLで使用可能な形式（%xx）に変換
-          encoded_keywords = urllib.parse.quote(keywords)
-          rss_url = f"https://news.google.com/rss/search?q={encoded_keywords}&hl=en-US&gl=US&ceid=US:en"
+          # URLをエンコード済みの形式で直接指定（エラー回避のため）
+          # キーワード: M&A, Corporate Finance, Investment Banking, Cross-border deal
+          rss_url = "https://news.google.com/rss/search?q=M%26A%20%22Corporate%20Finance%22%20%22Investment%20Banking%22%20%22Cross-border%20deal%22&hl=en-US&gl=US&ceid=US:en"
 
           def fetch_news():
-              # ユーザーエージェントを設定（アクセス拒否対策）
+              # フィードの解析
               feed = feedparser.parse(rss_url)
               entries = feed.entries[:5]
               
@@ -65,12 +61,11 @@ jobs:
           news_list = fetch_news()
 
           if news_list:
+              # メッセージ送信（確実に改行されるように結合）
               message = "🗞️ **Financial & M&A News Top 5**\n\n" + "\n".join(news_list)
           else:
               message = "🗞️ No major news found today."
 
           # Discord送信
-          res = requests.post(webhook_url, json={"content": message})
-          if res.status_code != 204:
-              print(f"Discord API Error: {res.status_code}")
+          requests.post(webhook_url, json={"content": message})
           EOF
