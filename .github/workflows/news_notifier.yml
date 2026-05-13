@@ -2,15 +2,14 @@ name: Financial & M&A News Notifier
 
 on:
   schedule:
-    - cron: '0 23 * * *' # 日本時間の朝8:00（UTC 23:00）
+    - cron: '0 23 * * *' # 日本時間の朝8:00
   workflow_dispatch:
 
 jobs:
   notify:
     runs-on: ubuntu-latest
-    # ここに環境変数を追加
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true' 
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,7 +20,8 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install feedparser requests beautifulsoup4 googletrans==4.0.0-rc1
+        run: |
+          pip install feedparser requests
 
       - name: Fetch and Notify News
         env:
@@ -31,37 +31,46 @@ jobs:
           import feedparser
           import requests
           import os
-          from googletrans import Translator
+          import urllib.parse
 
-          # 検索キーワード（金融・M&A関連）
+          # 検索キーワード
           keywords = 'M&A "Corporate Finance" Investment Banking "Cross-border deal"'
-          # Google News RSS (英語設定)
-          rss_url = f"https://news.google.com/rss/search?q={keywords}&hl=en-US&gl=US&ceid=US:en"
+          
+          # キーワードをURLで使用可能な形式（%xx）に変換
+          encoded_keywords = urllib.parse.quote(keywords)
+          rss_url = f"https://news.google.com/rss/search?q={encoded_keywords}&hl=en-US&gl=US&ceid=US:en"
 
           def fetch_news():
+              # ユーザーエージェントを設定（アクセス拒否対策）
               feed = feedparser.parse(rss_url)
-              translator = Translator()
-              entries = feed.entries[:5] # 最新5件を取得
+              entries = feed.entries[:5]
               
+              if not entries:
+                  return None
+                  
               news_items = []
               for entry in entries:
-                  # タイトルを翻訳
-                  try:
-                      translated = translator.translate(entry.title, dest='ja').text
-                  except:
-                      translated = entry.title
-                  
-                  news_items.append(f"**【タイトル】** {translated}\n**【ソース】** {entry.source.get('title', 'Unknown')}\n**【リンク】** {entry.link}\n")
+                  title = entry.title
+                  source = entry.source.get('title', 'Unknown')
+                  link = entry.link
+                  news_items.append(f"**【Title】** {title}\n**【Source】** {source}\n**【Link】** {link}\n")
               
               return news_items
 
-          webhook_url = os.environ['WEBHOOK_URL']
+          webhook_url = os.environ.get('WEBHOOK_URL')
+          if not webhook_url:
+              print("Error: WEBHOOK_URL is not set")
+              exit(1)
+
           news_list = fetch_news()
 
           if news_list:
-              message = "🗞️ **本日の金融・M&Aニューストップ5**\n\n" + "\n".join(news_list)
+              message = "🗞️ **Financial & M&A News Top 5**\n\n" + "\n".join(news_list)
           else:
-              message = "🗞️ 本日の大きなニュースは見つかりませんでした。"
+              message = "🗞️ No major news found today."
 
-          requests.post(webhook_url, json={"content": message})
+          # Discord送信
+          res = requests.post(webhook_url, json={"content": message})
+          if res.status_code != 204:
+              print(f"Discord API Error: {res.status_code}")
           EOF
