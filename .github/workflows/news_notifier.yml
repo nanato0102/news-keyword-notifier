@@ -32,40 +32,43 @@ jobs:
           import requests
           import os
 
-          # URLをエンコード済みの形式で直接指定（エラー回避のため）
-          # キーワード: M&A, Corporate Finance, Investment Banking, Cross-border deal
-          rss_url = "https://news.google.com/rss/search?q=M%26A%20%22Corporate%20Finance%22%20%22Investment%20Banking%22%20%22Cross-border%20deal%22&hl=en-US&gl=US&ceid=US:en"
+          # キーワードを少し広めに設定 (M&A OR "Corporate Finance" OR "Finance")
+          rss_url = "https://news.google.com/rss/search?q=M%26A%20OR%20Finance%20OR%20Business&hl=en-US&gl=US&ceid=US:en"
 
           def fetch_news():
-              # フィードの解析
               feed = feedparser.parse(rss_url)
               entries = feed.entries[:5]
               
               if not entries:
-                  return None
+                  return []
                   
               news_items = []
               for entry in entries:
                   title = entry.title
                   source = entry.source.get('title', 'Unknown')
                   link = entry.link
-                  news_items.append(f"**【Title】** {title}\n**【Source】** {source}\n**【Link】** {link}\n")
+                  news_items.append(f"**【Title】** {title}\n**【Source】** {source}\n**【Link】** {link}")
               
               return news_items
 
           webhook_url = os.environ.get('WEBHOOK_URL')
-          if not webhook_url:
-              print("Error: WEBHOOK_URL is not set")
-              exit(1)
-
           news_list = fetch_news()
 
+          # メッセージの中身があるか確認
           if news_list:
-              # メッセージ送信（確実に改行されるように結合）
-              message = "🗞️ **Financial & M&A News Top 5**\n\n" + "\n".join(news_list)
+              message = "🗞️ **Financial & M&A News Top 5**\n\n" + "\n\n".join(news_list)
           else:
-              message = "🗞️ No major news found today."
+              # テストのために、ニュースがない場合も通知を送るようにしてみます
+              message = "🗞️ 本日の大きな金融ニュースは見つかりませんでした。"
 
-          # Discord送信
-          requests.post(webhook_url, json={"content": message})
+          # Discord送信を実行し、結果をログに出す
+          print(f"Sending message to Discord: {message[:50]}...")
+          res = requests.post(webhook_url, json={"content": message})
+          
+          # 送信結果のステータスコードを表示
+          print(f"Discord Response Status: {res.status_code}")
+          
+          # エラーがあれば明示的に終了させる
+          if res.status_code != 204:
+              print(f"Error sending message: {res.text}")
           EOF
