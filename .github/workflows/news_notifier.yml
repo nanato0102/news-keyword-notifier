@@ -1,0 +1,64 @@
+name: Financial & M&A News Notifier
+
+on:
+  schedule:
+    - cron: '0 23 * * *' # 日本時間の朝8:00（UTC 23:00）
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install feedparser requests beautifulsoup4 googletrans==4.0.0-rc1
+
+      - name: Fetch and Notify News
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          python - <<EOF
+          import feedparser
+          import requests
+          import os
+          from googletrans import Translator
+
+          # 検索キーワード（金融・M&A関連）
+          keywords = 'M&A "Corporate Finance" Investment Banking "Cross-border deal"'
+          # Google News RSS (英語設定)
+          rss_url = f"https://news.google.com/rss/search?q={keywords}&hl=en-US&gl=US&ceid=US:en"
+
+          def fetch_news():
+              feed = feedparser.parse(rss_url)
+              translator = Translator()
+              entries = feed.entries[:5] # 最新5件を取得
+              
+              news_items = []
+              for entry in entries:
+                  # タイトルを翻訳
+                  try:
+                      translated = translator.translate(entry.title, dest='ja').text
+                  except:
+                      translated = entry.title
+                  
+                  news_items.append(f"**【タイトル】** {translated}\n**【ソース】** {entry.source.get('title', 'Unknown')}\n**【リンク】** {entry.link}\n")
+              
+              return news_items
+
+          webhook_url = os.environ['WEBHOOK_URL']
+          news_list = fetch_news()
+
+          if news_list:
+              message = "🗞️ **本日の金融・M&Aニューストップ5**\n\n" + "\n".join(news_list)
+          else:
+              message = "🗞️ 本日の大きなニュースは見つかりませんでした。"
+
+          requests.post(webhook_url, json={"content": message})
+          EOF
