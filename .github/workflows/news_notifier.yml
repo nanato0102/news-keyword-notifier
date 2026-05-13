@@ -8,6 +8,9 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    # ここに環境変数を追加
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true' 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
